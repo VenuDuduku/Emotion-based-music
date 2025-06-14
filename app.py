@@ -4,42 +4,57 @@ from predict_emotion import predict_emotion
 from emotion_to_song import get_songs_by_emotion
 
 st.set_page_config(page_title="Emotion-Based Song Recommender", layout="centered")
+
 st.title("🎵 Emotion-Based Song Recommender")
+st.markdown("Upload or capture your face image to detect emotion and get personalized song suggestions.")
 
-st.write("Upload a photo or use webcam to detect your emotion and get personalized multilingual song suggestions.")
+# --- Input Method Selection ---
+input_method = st.radio("Select Input Method:", ["📤 Upload Image", "📸 Use Webcam"])
 
-# Image input section
 image = None
-option = st.radio("Choose input method:", ["Upload Image", "Use Webcam"])
 
-if option == "Upload Image":
-    uploaded = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
-    if uploaded:
-        image = Image.open(uploaded)
+if input_method == "📤 Upload Image":
+    uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+    if uploaded_file:
+        image = Image.open(uploaded_file)
         st.image(image, caption="Uploaded Image", use_column_width=True)
 
-elif option == "Use Webcam":
-    img_file_buffer = st.camera_input("Take a picture")
-    if img_file_buffer:
-        image = Image.open(img_file_buffer)
-        st.image(image, caption="Webcam Snapshot", use_column_width=True)
+elif input_method == "📸 Use Webcam":
+    captured_image = st.camera_input("Capture a photo")
+    if captured_image:
+        image = Image.open(captured_image)
+        st.image(image, caption="Captured Image", use_column_width=True)
 
-# Process the image and recommend songs
-if image and st.button("🎯 Detect Emotion & Recommend Songs"):
+# --- Language Filter ---
+language_choice = st.selectbox("🌐 Preferred Language:", 
+                               options=["All", "Telugu", "Hindi", "English", "Malayalam"])
+
+# --- Process if Image Exists ---
+if image:
     emotion = predict_emotion(image)
 
     if emotion:
-        st.subheader(f"Detected Emotion: **{emotion.upper()}**")
+        st.success(f"🎭 You look **{emotion.capitalize()}** today! Here's your mood-based playlist:")
 
+        # Get songs
         songs = get_songs_by_emotion(emotion)
+
+        # Filter by language
+        if language_choice != "All":
+            songs = [s for s in songs if s['Language'].lower() == language_choice.lower()]
+
         if songs:
-            for lang, platforms in songs.items():
-                st.markdown(f"### 🌐 {lang.capitalize()} Songs")
-                for platform, song_list in platforms.items():
-                    st.markdown(f"**{platform.capitalize()}**:")
-                    for song in song_list:
-                        st.markdown(f"- {song}")
+            st.markdown("### 🎶 Recommended Songs:")
+            for song in songs:
+                song_name = song.get("Song", "Unknown")
+                platform = song.get("Platform", "Unknown").capitalize()
+                language = song.get("Language", "Unknown").capitalize()
+                link = song.get("Link", "#")
+
+                icon = "🔴" if "youtube" in link.lower() else "🎵" if "spotify" in link.lower() else "🎧"
+
+                st.markdown(f'<a href="{link}" target="_blank" style="text-decoration: none; font-size: 18px;">{icon} <b>{song_name}</b> ({language}, {platform})</a>', unsafe_allow_html=True)
         else:
-            st.warning("No songs found for the detected emotion.")
+            st.warning(f"No songs found for **{emotion}** in **{language_choice}**.")
     else:
-        st.error("Emotion could not be detected. Please try another image.")
+        st.error("⚠️ Could not detect emotion. Try using a clearer image.")
