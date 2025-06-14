@@ -1,0 +1,109 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emotion-Based Song Recommender</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎵 Emotion-Based Song Recommender</h1>
+      <p>
+        Upload your photo or use your webcam to get personalized music
+        recommendations!
+      </p>
+
+      <div class="upload-section">
+        <input type="file" id="imageUpload" accept="image/*" />
+        <button onclick="uploadImage()">Upload & Predict</button>
+      </div>
+
+      <div class="webcam-section">
+        <video id="webcam" autoplay></video>
+        <canvas id="snapshotCanvas" style="display: none"></canvas>
+        <button onclick="captureAndUpload()">📷 Capture & Predict</button>
+      </div>
+
+      <div id="result"></div>
+      <div id="songs"></div>
+    </div>
+
+    <script>
+      const video = document.getElementById("webcam");
+      const canvas = document.getElementById("snapshotCanvas");
+
+      navigator.mediaDevices
+        .getUserMedia({ video: true })
+        .then((stream) => (video.srcObject = stream))
+        .catch((err) => console.error("Webcam error:", err));
+
+      function captureAndUpload() {
+        canvas.width = 224;
+        canvas.height = 224;
+        const context = canvas.getContext("2d");
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            alert("Could not capture image. Try again.");
+            return;
+          }
+
+          const formData = new FormData();
+          formData.append("image", blob, "snapshot.png");
+
+          fetch("/predict", {
+            method: "POST",
+            body: formData,
+          })
+            .then((res) => res.json())
+            .then((data) => displayResult(data))
+            .catch((err) => console.error("Upload failed:", err));
+        }, "image/png");
+      }
+
+      function uploadImage() {
+        const input = document.getElementById("imageUpload");
+        const file = input.files[0];
+        if (!file) return alert("Please select a file first.");
+
+        const formData = new FormData();
+        formData.append("image", file);
+
+        fetch("/predict", {
+          method: "POST",
+          body: formData,
+        })
+          .then((res) => res.json())
+          .then((data) => displayResult(data))
+          .catch((err) => console.error("Upload failed:", err));
+      }
+
+      function displayResult(data) {
+        const resultDiv = document.getElementById("result");
+        const songsDiv = document.getElementById("songs");
+
+        if (data.error) {
+          resultDiv.innerHTML = `<p class='error'>${data.error}</p>`;
+          songsDiv.innerHTML = "";
+        } else {
+          resultDiv.innerHTML = `<h2>Detected Emotion: ${data.emotion}</h2>`;
+          songsDiv.innerHTML =
+            "<h3>Recommended Songs:</h3>" +
+            data.songs
+              .map(
+                (song) => `
+            <div class="song">
+              <p><strong>${song.name}</strong> (${song.language} - ${song.platform})</p>
+              <a href="${song.link}" target="_blank">Listen 🎧</a>
+            </div>
+          `
+              )
+              .join("");
+        }
+      }
+    </script>
+  </body>
+</html>
